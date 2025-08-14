@@ -1,8 +1,32 @@
-local Permissions = require(script.Parent.Permissions)
 local Util = require(script.Parent.Util)
 local Commands = script.Parent.Commands
+local AdminConfig = require(game:GetService("ServerScriptService"):WaitForChild("AdminConfig"))
 
 local CommandHandler = {}
+
+function CommandHandler:GetRank(player)
+    for rank, ids in pairs(AdminConfig.Ranks) do
+        for _, id in ipairs(ids) do
+            if player.UserId == id then
+                return rank
+            end
+        end
+    end
+    return nil
+end
+
+function CommandHandler:CanRun(player, commandName)
+    local rank = self:GetRank(player)
+    if not rank then return false end
+
+    local allowedRanks = AdminConfig.Permissions[commandName]
+    if not allowedRanks then return false end
+
+    for _, r in ipairs(allowedRanks) do
+        if r == rank then return true end
+    end
+    return false
+end
 
 function CommandHandler:Process(player, message)
     if not message:match("^/") then return end
@@ -12,11 +36,10 @@ function CommandHandler:Process(player, message)
     local commandModule = Commands:FindFirstChild(cmdName)
 
     if commandModule and commandModule:IsA("ModuleScript") then
-        local command = require(commandModule)
-        if command.canRun(player) then
-            command.run(player, args)
+        if self:CanRun(player, cmdName) then
+            require(commandModule).run(player, args)
         else
-            player:Kick("Insufficient permissions.")
+            player:Kick("You don't have permission to run /" .. cmdName)
         end
     end
 end
